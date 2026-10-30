@@ -14,7 +14,10 @@ class Talkia_Settings {
 	const NONCE_DISCONNECT = 'talkia_connect_disconnect';
 	const NONCE_UPDATE_BOT = 'talkia_connect_update_bot';
 
-	const BUBBLE_INTERVALS = array( 0, 5, 10, 15 );
+	// Segundos, não minutos (bug corrigido do lado da Talkia: 5/10/15 min era
+	// tempo demais pra uma saudação repetir de verdade). Precisa bater com
+	// BUBBLE_INTERVALS em customizations/views.py no talkia-web.
+	const BUBBLE_INTERVALS = array( 0, 10, 15, 20 );
 
 	// Mesma lista usada no customizador principal da Talkia (ver
 	// static/js/customizer-schema.js) — uma grade pra clicar evita o
@@ -446,9 +449,9 @@ class Talkia_Settings {
 						<th scope="row"><label for="bubble_interval"><?php esc_html_e( 'Repetir mensagem a cada', 'talkia-connect' ); ?></label></th>
 						<td>
 							<select id="bubble_interval" name="bubble_interval">
-								<?php foreach ( self::BUBBLE_INTERVALS as $minutes ) : ?>
-									<option value="<?php echo esc_attr( $minutes ); ?>" <?php selected( isset( $bubble['interval'] ) ? (int) $bubble['interval'] : 0, $minutes ); ?>>
-										<?php echo 0 === $minutes ? esc_html__( 'Desativado', 'talkia-connect' ) : esc_html( $minutes . ' minutos' ); ?>
+								<?php foreach ( self::BUBBLE_INTERVALS as $seconds ) : ?>
+									<option value="<?php echo esc_attr( $seconds ); ?>" <?php selected( isset( $bubble['interval'] ) ? (int) $bubble['interval'] : 0, $seconds ); ?>>
+										<?php echo 0 === $seconds ? esc_html__( 'Desativado', 'talkia-connect' ) : esc_html( $seconds . ' segundos' ); ?>
 									</option>
 								<?php endforeach; ?>
 							</select>
