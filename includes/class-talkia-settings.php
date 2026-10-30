@@ -16,15 +16,40 @@ class Talkia_Settings {
 
 	const BUBBLE_INTERVALS = array( 0, 5, 10, 15 );
 
+	// Mesma lista usada no customizador principal da Talkia (ver
+	// static/js/customizer-schema.js) — uma grade pra clicar evita o
+	// problema de alguém digitar um código tipo ":rock:" achando que vira
+	// emoji sozinho (isso só funciona em Slack/Discord, não aqui).
+	const EMOJIS = array(
+		'🤖', '💬', '📞', '⭐', '💡', '✨', '🔥', '⚡',
+		'🩺', '🦷', '💊', '🏥', '🧘', '💆', '🐾', '🐶',
+		'🐱', '🐩', '🌿', '💚', '🌻', '🌾', '🎯', '🌈',
+		'🏢', '🤝', '📊', '📈', '💼', '🧾', '⚖️', '🏠',
+		'🚚', '🌐', '🖥️', '🛒', '🎓', '🚀', '🎮', '🕹️',
+		'👾', '⚔️', '🛡️', '🏹', '🧱', '🎲', '🏆', '❤️',
+	);
+
+	/** Hook suffix devolvido por add_menu_page() — usado pra só carregar o
+	 * CSS/JS da pré-visualização do balão na nossa própria página (nunca no
+	 * resto do wp-admin). */
+	private static $page_hook = '';
+
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'register_menu' ) );
+		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_admin_assets' ) );
 		add_action( 'admin_post_talkia_connect_save_token', array( __CLASS__, 'handle_save' ) );
 		add_action( 'admin_post_talkia_connect_disconnect', array( __CLASS__, 'handle_disconnect' ) );
 		add_action( 'admin_post_talkia_connect_update_bot', array( __CLASS__, 'handle_update_bot' ) );
 	}
 
+	/** URL do painel completo da Talkia — treino da IA, token e código de
+	 * implantação continuam só lá, nunca duplicados aqui no plugin. */
+	private static function panel_url() {
+		return rtrim( defined( 'TALKIA_CONNECT_API_BASE' ) ? TALKIA_CONNECT_API_BASE : 'https://talkia.8bitlab.com.br', '/' ) . '/conta/painel/';
+	}
+
 	public static function register_menu() {
-		add_menu_page(
+		self::$page_hook = add_menu_page(
 			'Talkia',
 			'Talkia',
 			'manage_options',
@@ -33,6 +58,94 @@ class Talkia_Settings {
 			'dashicons-format-chat',
 			80
 		);
+	}
+
+	public static function enqueue_admin_assets( $hook ) {
+		if ( $hook !== self::$page_hook ) {
+			return; // Nunca carrega isso no resto do wp-admin.
+		}
+
+		// wp_register_*( ..., false, ... ) cria um handle só pra carregar
+		// CSS/JS embutido via wp_add_inline_*, sem precisar de um arquivo
+		// próprio — não tem conteúdo dinâmico nenhum aqui (nada de dado de
+		// usuário interpolado), então embutir direto é seguro.
+		wp_register_style( 'talkia-connect-admin', false, array(), TALKIA_CONNECT_VERSION );
+		wp_enqueue_style( 'talkia-connect-admin' );
+		wp_add_inline_style( 'talkia-connect-admin', self::admin_css() );
+
+		wp_register_script( 'talkia-connect-admin', false, array(), TALKIA_CONNECT_VERSION, true );
+		wp_enqueue_script( 'talkia-connect-admin' );
+		wp_add_inline_script( 'talkia-connect-admin', self::admin_js() );
+	}
+
+	private static function admin_css() {
+		return '
+			.talkia-section { background:#fff; border:1px solid #c3c4c7; border-radius:4px; padding:20px 24px; margin:0 0 20px; max-width:700px; }
+			.talkia-section h2 { margin:0 0 16px; font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:#646970; }
+			.talkia-scope-note { background:#f0f6fc; border-left:4px solid #72aee6; padding:12px 16px; margin:0 0 20px; max-width:700px; }
+			.talkia-scope-note p { margin:.5em 0; }
+			.talkia-preview-row { display:flex; align-items:center; gap:16px; margin:0 0 20px; }
+			.talkia-bubble-preview { width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; color:#fff; box-shadow:0 2px 6px rgba(0,0,0,.2); flex-shrink:0; background:#ea532e; }
+			.talkia-preview-label { font-size:12px; color:#646970; }
+			.talkia-emoji-grid { display:flex; flex-wrap:wrap; gap:4px; max-width:420px; margin:8px 0; }
+			.talkia-emoji-btn { width:32px; height:32px; font-size:16px; line-height:1; padding:0; border:1px solid #dcdcde; background:#fff; border-radius:3px; cursor:pointer; }
+			.talkia-emoji-btn:hover, .talkia-emoji-btn.is-selected { border-color:#2271b1; background:#f0f6fc; }
+		';
+	}
+
+	private static function admin_js() {
+		return '
+			(function () {
+				var preview = document.getElementById("talkia-bubble-preview");
+				if (!preview) return;
+				var modeEl = document.getElementById("bubble_mode");
+				var emojiEl = document.getElementById("bubble_emoji");
+				var bgEl = document.getElementById("bubble_bg");
+				var emojiBtns = document.querySelectorAll(".talkia-emoji-btn");
+
+				function markSelected() {
+					var current = emojiEl ? emojiEl.value.trim() : "";
+					emojiBtns.forEach(function (btn) {
+						btn.classList.toggle("is-selected", btn.getAttribute("data-emoji") === current);
+					});
+				}
+
+				function update() {
+					preview.style.background = (bgEl && bgEl.value) || "#ea532e";
+					var mode = modeEl ? modeEl.value : "default";
+					if (mode === "emoji" && emojiEl && emojiEl.value.trim()) {
+						// slice(0,2) cobre o par substituto UTF-16 de um emoji
+						// so (ex.: paw print), nao duas letras quaisquer.
+						preview.textContent = emojiEl.value.trim().slice(0, 2);
+					} else if (mode === "image") {
+						preview.textContent = "🖼";
+					} else {
+						preview.textContent = "💬";
+					}
+					markSelected();
+				}
+
+				[modeEl, emojiEl, bgEl].forEach(function (el) {
+					if (el) el.addEventListener("input", update);
+				});
+
+				emojiBtns.forEach(function (btn) {
+					btn.addEventListener("click", function () {
+						if (emojiEl) emojiEl.value = btn.getAttribute("data-emoji") || "";
+						// Escolher um emoji da grade so faz sentido com o
+						// icone em modo "Emoji" -- troca sozinho pra evitar
+						// o usuario clicar e nao entender por que nao mudou.
+						if (modeEl && modeEl.value !== "emoji") {
+							var hasEmojiOption = Array.prototype.some.call(modeEl.options, function (o) { return o.value === "emoji"; });
+							if (hasEmojiOption) modeEl.value = "emoji";
+						}
+						update();
+					});
+				});
+
+				update();
+			})();
+		';
 	}
 
 	public static function handle_save() {
@@ -215,6 +328,18 @@ class Talkia_Settings {
 				<p><em><?php esc_html_e( 'Atenção: este chatbot ainda não está marcado como pago na Talkia — o widget não aparece no site até isso ser confirmado.', 'talkia-connect' ); ?></em></p>
 			<?php endif; ?>
 		</div>
+
+		<div class="talkia-scope-note">
+			<p><strong><?php esc_html_e( 'O que fica aqui no plugin e o que fica no painel da Talkia', 'talkia-connect' ); ?></strong></p>
+			<p><?php esc_html_e( 'Aqui no WordPress você só ajusta a aparência do chatbot (nome, balão) na aba "Configurações" — o resto continua só no painel completo da Talkia:', 'talkia-connect' ); ?></p>
+			<ul style="list-style:disc; padding-left:20px; margin:.5em 0;">
+				<li><?php esc_html_e( 'Treinar a IA com as informações do seu negócio', 'talkia-connect' ); ?></li>
+				<li><?php esc_html_e( 'Gerar ou revogar o token de conexão', 'talkia-connect' ); ?></li>
+				<li><?php esc_html_e( 'Pegar o código de implantação manual, ver status do pagamento, etc.', 'talkia-connect' ); ?></li>
+			</ul>
+			<p><a href="<?php echo esc_url( self::panel_url() ); ?>" target="_blank" rel="noopener noreferrer" class="button"><?php esc_html_e( 'Abrir o painel completo da Talkia ↗', 'talkia-connect' ); ?></a></p>
+		</div>
+
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="talkia_connect_disconnect">
 			<?php wp_nonce_field( self::NONCE_DISCONNECT ); ?>
@@ -229,58 +354,109 @@ class Talkia_Settings {
 		$bubble  = $bot && isset( $bot['bubble'] ) ? $bot['bubble'] : array();
 		$mode    = isset( $bubble['mode'] ) ? $bubble['mode'] : 'default';
 		?>
+		<div class="talkia-scope-note">
+			<p>
+				<?php
+				printf(
+					/* translators: %s: link to the full Talkia panel */
+					esc_html__( 'Isso aqui muda só a aparência do chatbot no site. Treino da IA, token e código de implantação continuam no %s.', 'talkia-connect' ),
+					'<a href="' . esc_url( self::panel_url() ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'painel completo da Talkia ↗', 'talkia-connect' ) . '</a>'
+				);
+				?>
+			</p>
+		</div>
+
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="talkia_connect_update_bot">
 			<?php wp_nonce_field( self::NONCE_UPDATE_BOT ); ?>
-			<table class="form-table" role="presentation">
-				<tr>
-					<th scope="row"><label for="persona_name"><?php esc_html_e( 'Nome do chatbot', 'talkia-connect' ); ?></label></th>
-					<td><input type="text" id="persona_name" name="persona_name" class="regular-text" maxlength="120" value="<?php echo esc_attr( isset( $persona['name'] ) ? $persona['name'] : '' ); ?>"></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="persona_tagline"><?php esc_html_e( 'Subtítulo', 'talkia-connect' ); ?></label></th>
-					<td><input type="text" id="persona_tagline" name="persona_tagline" class="regular-text" maxlength="200" value="<?php echo esc_attr( isset( $persona['tagline'] ) ? $persona['tagline'] : '' ); ?>"></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="bubble_mode"><?php esc_html_e( 'Ícone do balão', 'talkia-connect' ); ?></label></th>
-					<td>
-						<select id="bubble_mode" name="bubble_mode">
-							<option value="default" <?php selected( $mode, 'default' ); ?>><?php esc_html_e( 'Padrão (💬)', 'talkia-connect' ); ?></option>
-							<option value="emoji" <?php selected( $mode, 'emoji' ); ?>><?php esc_html_e( 'Emoji', 'talkia-connect' ); ?></option>
+
+			<div class="talkia-section">
+				<h2><?php esc_html_e( 'Identidade do chatbot', 'talkia-connect' ); ?></h2>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><label for="persona_name"><?php esc_html_e( 'Nome do chatbot', 'talkia-connect' ); ?></label></th>
+						<td><input type="text" id="persona_name" name="persona_name" class="regular-text" maxlength="120" value="<?php echo esc_attr( isset( $persona['name'] ) ? $persona['name'] : '' ); ?>"></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="persona_tagline"><?php esc_html_e( 'Subtítulo', 'talkia-connect' ); ?></label></th>
+						<td><input type="text" id="persona_tagline" name="persona_tagline" class="regular-text" maxlength="200" value="<?php echo esc_attr( isset( $persona['tagline'] ) ? $persona['tagline'] : '' ); ?>">
+							<p class="description"><?php esc_html_e( 'Aparece embaixo do nome, no cabeçalho do balão de conversa.', 'talkia-connect' ); ?></p>
+						</td>
+					</tr>
+				</table>
+			</div>
+
+			<div class="talkia-section">
+				<h2><?php esc_html_e( 'Balão flutuante', 'talkia-connect' ); ?></h2>
+
+				<div class="talkia-preview-row">
+					<div id="talkia-bubble-preview" class="talkia-bubble-preview" aria-hidden="true">💬</div>
+					<span class="talkia-preview-label"><?php esc_html_e( 'Pré-visualização (atualiza ao digitar, antes de salvar)', 'talkia-connect' ); ?></span>
+				</div>
+
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><label for="bubble_mode"><?php esc_html_e( 'Ícone do balão', 'talkia-connect' ); ?></label></th>
+						<td>
+							<select id="bubble_mode" name="bubble_mode">
+								<option value="default" <?php selected( $mode, 'default' ); ?>><?php esc_html_e( 'Padrão (💬)', 'talkia-connect' ); ?></option>
+								<option value="emoji" <?php selected( $mode, 'emoji' ); ?>><?php esc_html_e( 'Emoji', 'talkia-connect' ); ?></option>
+								<?php if ( 'image' === $mode ) : ?>
+									<option value="image" selected disabled><?php esc_html_e( 'Imagem (gerenciada no painel da Talkia)', 'talkia-connect' ); ?></option>
+								<?php endif; ?>
+							</select>
 							<?php if ( 'image' === $mode ) : ?>
-								<option value="image" selected disabled><?php esc_html_e( 'Imagem (gerenciada no painel da Talkia)', 'talkia-connect' ); ?></option>
+								<p class="description"><?php esc_html_e( 'O ícone de imagem só pode ser trocado no painel da Talkia — escolher outra opção aqui troca para esse modo.', 'talkia-connect' ); ?></p>
+							<?php else : ?>
+								<p class="description"><?php esc_html_e( '"Padrão" usa o ícone de balão de conversa; escolha "Emoji" para usar outro símbolo.', 'talkia-connect' ); ?></p>
 							<?php endif; ?>
-						</select>
-						<?php if ( 'image' === $mode ) : ?>
-							<p class="description"><?php esc_html_e( 'O ícone de imagem só pode ser trocado no painel da Talkia — escolher outra opção aqui troca para esse modo.', 'talkia-connect' ); ?></p>
-						<?php endif; ?>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="bubble_emoji"><?php esc_html_e( 'Emoji do balão', 'talkia-connect' ); ?></label></th>
-					<td><input type="text" id="bubble_emoji" name="bubble_emoji" maxlength="8" style="width:5em" value="<?php echo esc_attr( isset( $bubble['emoji'] ) ? $bubble['emoji'] : '' ); ?>"></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="bubble_bg"><?php esc_html_e( 'Cor do balão', 'talkia-connect' ); ?></label></th>
-					<td><input type="color" id="bubble_bg" name="bubble_bg" value="<?php echo esc_attr( isset( $bubble['bg'] ) && $bubble['bg'] ? $bubble['bg'] : '#ea532e' ); ?>"></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="bubble_greeting"><?php esc_html_e( 'Mensagem ao passar o mouse', 'talkia-connect' ); ?></label></th>
-					<td><input type="text" id="bubble_greeting" name="bubble_greeting" class="regular-text" maxlength="80" value="<?php echo esc_attr( isset( $bubble['greeting'] ) ? $bubble['greeting'] : '' ); ?>"></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="bubble_interval"><?php esc_html_e( 'Repetir mensagem a cada', 'talkia-connect' ); ?></label></th>
-					<td>
-						<select id="bubble_interval" name="bubble_interval">
-							<?php foreach ( self::BUBBLE_INTERVALS as $minutes ) : ?>
-								<option value="<?php echo esc_attr( $minutes ); ?>" <?php selected( isset( $bubble['interval'] ) ? (int) $bubble['interval'] : 0, $minutes ); ?>>
-									<?php echo 0 === $minutes ? esc_html__( 'Desativado', 'talkia-connect' ) : esc_html( $minutes . ' minutos' ); ?>
-								</option>
-							<?php endforeach; ?>
-						</select>
-					</td>
-				</tr>
-			</table>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="bubble_emoji"><?php esc_html_e( 'Emoji do balão', 'talkia-connect' ); ?></label></th>
+						<td>
+							<div class="talkia-emoji-grid" role="group" aria-label="<?php esc_attr_e( 'Escolher emoji', 'talkia-connect' ); ?>">
+								<?php foreach ( self::EMOJIS as $emoji ) : ?>
+									<?php
+									// data-emoji guarda o valor de verdade: o WordPress troca
+									// sozinho o emoji visível por uma <img> (recurso nativo de
+									// compatibilidade, "wp-emoji"), então ler o texto do botão
+									// depois que a página carrega vem vazio — o atributo não
+									// sofre essa troca.
+									?>
+									<button type="button" class="talkia-emoji-btn" data-emoji="<?php echo esc_attr( $emoji ); ?>" aria-label="<?php echo esc_attr( sprintf( __( 'Usar %s', 'talkia-connect' ), $emoji ) ); ?>"><?php echo esc_html( $emoji ); ?></button>
+								<?php endforeach; ?>
+							</div>
+							<input type="text" id="bubble_emoji" name="bubble_emoji" maxlength="8" style="width:6em" placeholder="<?php esc_attr_e( 'ou cole um emoji', 'talkia-connect' ); ?>" value="<?php echo esc_attr( isset( $bubble['emoji'] ) ? $bubble['emoji'] : '' ); ?>">
+							<p class="description"><?php esc_html_e( 'Só usado quando o ícone acima está em "Emoji". Clique num emoji da lista ou cole outro — texto como ":rock:" não vira emoji sozinho, precisa ser o símbolo em si.', 'talkia-connect' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="bubble_bg"><?php esc_html_e( 'Cor do balão', 'talkia-connect' ); ?></label></th>
+						<td><input type="color" id="bubble_bg" name="bubble_bg" value="<?php echo esc_attr( isset( $bubble['bg'] ) && $bubble['bg'] ? $bubble['bg'] : '#ea532e' ); ?>"></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="bubble_greeting"><?php esc_html_e( 'Mensagem ao passar o mouse', 'talkia-connect' ); ?></label></th>
+						<td>
+							<input type="text" id="bubble_greeting" name="bubble_greeting" class="regular-text" maxlength="80" value="<?php echo esc_attr( isset( $bubble['greeting'] ) ? $bubble['greeting'] : '' ); ?>">
+							<p class="description"><?php esc_html_e( 'Balãozinho que aparece ao passar o mouse no ícone, antes de abrir o chat. Deixe em branco pra não mostrar nada.', 'talkia-connect' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="bubble_interval"><?php esc_html_e( 'Repetir mensagem a cada', 'talkia-connect' ); ?></label></th>
+						<td>
+							<select id="bubble_interval" name="bubble_interval">
+								<?php foreach ( self::BUBBLE_INTERVALS as $minutes ) : ?>
+									<option value="<?php echo esc_attr( $minutes ); ?>" <?php selected( isset( $bubble['interval'] ) ? (int) $bubble['interval'] : 0, $minutes ); ?>>
+										<?php echo 0 === $minutes ? esc_html__( 'Desativado', 'talkia-connect' ) : esc_html( $minutes . ' minutos' ); ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+						</td>
+					</tr>
+				</table>
+			</div>
+
 			<?php submit_button( __( 'Salvar', 'talkia-connect' ) ); ?>
 		</form>
 		<?php
