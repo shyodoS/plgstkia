@@ -34,3 +34,14 @@ require_once TALKIA_CONNECT_DIR . 'includes/class-talkia-widget.php';
 
 Talkia_Settings::init();
 Talkia_Widget::init();
+
+// Repo público no GitHub: sem token de autenticação embutido no plugin (ver
+// PLANO_PLUGIN_WORDPRESS.md — decisão de tornar o repo público justamente pra
+// evitar isso). Cada "Release" novo no GitHub já aparece como atualização
+// disponível pra quem tiver o plugin instalado.
+require_once TALKIA_CONNECT_DIR . 'vendor/plugin-update-checker/plugin-update-checker.php';
+\YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+	'https://github.com/shyodoS/plgstkia/',
+	__FILE__,
+	'talkia-connect'
+);
