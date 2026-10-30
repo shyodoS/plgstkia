@@ -30,5 +30,7 @@ if ( ! defined( 'TALKIA_CONNECT_API_BASE' ) ) {
 require_once TALKIA_CONNECT_DIR . 'includes/class-talkia-token-store.php';
 require_once TALKIA_CONNECT_DIR . 'includes/class-talkia-api-client.php';
 require_once TALKIA_CONNECT_DIR . 'includes/class-talkia-settings.php';
+require_once TALKIA_CONNECT_DIR . 'includes/class-talkia-widget.php';
 
 Talkia_Settings::init();
+Talkia_Widget::init();
