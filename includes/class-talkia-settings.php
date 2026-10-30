@@ -51,6 +51,25 @@ class Talkia_Settings {
 		return rtrim( defined( 'TALKIA_CONNECT_API_BASE' ) ? TALKIA_CONNECT_API_BASE : 'https://talkia.8bitlab.com.br', '/' ) . '/conta/painel/';
 	}
 
+	/**
+	 * Busca o estado atual do bot na Talkia e atualiza o cache local antes de
+	 * desenhar a tela — sem isso, quem edita persona/balão pelo painel
+	 * principal via um admin que já conectou o plugin, e depois abre a tela
+	 * do plugin, veria (e poderia sem querer resalvar) um valor antigo.
+	 * Best-effort: se a Talkia estiver fora do ar, fica com o que já tinha em
+	 * cache em vez de quebrar a tela.
+	 */
+	private static function refresh_bot_cache() {
+		$raw_token = Talkia_Token_Store::get_token();
+		if ( ! $raw_token ) {
+			return;
+		}
+		$result = Talkia_Api_Client::get_bot( $raw_token );
+		if ( ! empty( $result['ok'] ) ) {
+			Talkia_Token_Store::save_bot_cache( $result );
+		}
+	}
+
 	public static function register_menu() {
 		self::$page_hook = add_menu_page(
 			'Talkia',
@@ -260,6 +279,8 @@ class Talkia_Settings {
 			echo '</div>';
 			return;
 		}
+
+		self::refresh_bot_cache();
 
 		self::render_tabs( $tab );
 		if ( 'settings' === $tab ) {
