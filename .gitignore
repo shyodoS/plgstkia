@@ -1,4 +1,19 @@
-.DS_Store
-Thumbs.db
+# --- segredos e ambiente (nunca vão para o repositório público)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.log
+wp-config.php
+
+# --- build
 *.zip
 /build/
+/node_modules/
+
+# --- editor / sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
