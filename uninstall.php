@@ -12,7 +12,7 @@ require_once __DIR__ . '/includes/class-talkia-token-store.php';
 require_once __DIR__ . '/includes/class-talkia-api-client.php';
 
 if ( ! defined( 'TALKIA_CONNECT_API_BASE' ) ) {
-	define( 'TALKIA_CONNECT_API_BASE', 'https://talkia.8bitlab.com.br' );
+	define( 'TALKIA_CONNECT_API_BASE', 'https://talkia.io' );
 }
 
 // Autorrevogação: nenhum concorrente pesquisado faz isso, mas evita deixar

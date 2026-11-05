@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Talkia_Api_Client {
 
 	private static function base_url() {
-		return defined( 'TALKIA_CONNECT_API_BASE' ) ? TALKIA_CONNECT_API_BASE : 'https://talkia.8bitlab.com.br';
+		return defined( 'TALKIA_CONNECT_API_BASE' ) ? TALKIA_CONNECT_API_BASE : 'https://talkia.io';
 	}
 
 	private static function request( $method, $path, $raw_token, $body = null ) {

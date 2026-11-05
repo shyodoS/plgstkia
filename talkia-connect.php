@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Talkia Connect
  * Plugin URI: https://github.com/shyodoS/plgstkia
- * Description: Sincroniza este site com o chatbot que você customizou na Talkia (talkia.8bitlab.com.br) — sem copiar/colar código, sem editar tema.
- * Version: 0.1.0
+ * Description: Sincroniza este site com o chatbot que você customizou na Talkia (talkia.io) — sem copiar/colar código, sem editar tema.
+ * Version: 0.1.1
  * Requires at least: 6.3
  * Requires PHP: 7.4
  * Author: 8Bit Lab
@@ -18,13 +18,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'TALKIA_CONNECT_VERSION', '0.1.0' );
+define( 'TALKIA_CONNECT_VERSION', '0.1.1' );
 define( 'TALKIA_CONNECT_DIR', plugin_dir_path( __FILE__ ) );
 define( 'TALKIA_CONNECT_FILE', __FILE__ );
 // Fixo de propósito: é o domínio de produção da Talkia, não algo que o
 // cliente final configura (ver PLANO_PLUGIN_WORDPRESS.md, repo talkia-web).
 if ( ! defined( 'TALKIA_CONNECT_API_BASE' ) ) {
-	define( 'TALKIA_CONNECT_API_BASE', 'https://talkia.8bitlab.com.br' );
+	define( 'TALKIA_CONNECT_API_BASE', 'https://talkia.io' );
 }
 
 require_once TALKIA_CONNECT_DIR . 'includes/class-talkia-token-store.php';

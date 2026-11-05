@@ -27,7 +27,7 @@ class Talkia_Widget {
 			return;
 		}
 
-		$src = rtrim( defined( 'TALKIA_CONNECT_API_BASE' ) ? TALKIA_CONNECT_API_BASE : 'https://talkia.8bitlab.com.br', '/' ) . '/static/js/embed.js';
+		$src = rtrim( defined( 'TALKIA_CONNECT_API_BASE' ) ? TALKIA_CONNECT_API_BASE : 'https://talkia.io', '/' ) . '/static/js/embed.js';
 
 		wp_enqueue_script(
 			self::HANDLE,

@@ -48,7 +48,7 @@ class Talkia_Settings {
 	/** URL do painel completo da Talkia — treino da IA, token e código de
 	 * implantação continuam só lá, nunca duplicados aqui no plugin. */
 	private static function panel_url() {
-		return rtrim( defined( 'TALKIA_CONNECT_API_BASE' ) ? TALKIA_CONNECT_API_BASE : 'https://talkia.8bitlab.com.br', '/' ) . '/conta/painel/';
+		return rtrim( defined( 'TALKIA_CONNECT_API_BASE' ) ? TALKIA_CONNECT_API_BASE : 'https://talkia.io', '/' ) . '/conta/painel/';
 	}
 
 	/**
